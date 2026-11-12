@@ -27,35 +27,62 @@ def instancia_processos(nome_arquivo: str):
 
 def first_come_first_served(processos: list):
 
-    # Cria a fila de processos FCFS
-    fila_fcfs = sorted(processos, key=lambda p: p.tempo_chegada)
-    # Cria uma lista para os processos concluídos
-    processos_resu = []
-    # Contador para controlar o tempo de chegada dos processos
-    cont = 0
+    processos_copy = sorted(
+        processos, key=lambda p: p.tempo_chegada
+    )  # Cópia dos processos
+    fila_fcfs = []  # Fila de processos
+    em_execucao = []  # Processo em execução
+    processos_concluidos = []  # Processos concluídos
+    cont = 0  # Contador
 
-    # Enquanto tiver elementos na fila executa
-    while fila_fcfs:
+    # Enquanto todos os processos ainda não tiverem sido concluídos executa
+    while len(processos_concluidos) != len(processos):
 
-        # Se o tempo de chegada for menor que o contador, ele vira o contador atual
-        cont = fila_fcfs[0].tempo_chegada if cont < fila_fcfs[0].tempo_chegada else cont
-        # Tempo de resposta e espera = contador - tempo de chegada
-        # São iguais por conta do funcionamento da fila no FCFS
-        fila_fcfs[0].tempo_resposta = cont - fila_fcfs[0].tempo_chegada
-        fila_fcfs[0].tempo_espera = cont - fila_fcfs[0].tempo_chegada
-        # Acrescenta ao contador o tempo de pico (processo foi executado)
-        cont += fila_fcfs[0].tempo_pico
-        # Tempo de retorno = contador (após a execução) - tempo de chegada
-        fila_fcfs[0].tempo_retorno = cont - fila_fcfs[0].tempo_chegada
+        # Vê quais processos chegaram no momento e
+        # coloca-os na fila e retira-os da lista de processos
+        while processos_copy and processos_copy[0].tempo_chegada == cont:
+            fila_fcfs.append(processos_copy[0])
+            processos_copy.remove(processos_copy[0])
 
-        # Põe o processo na fila de processos concluídos e retira-o da fila
-        processos_resu.append(fila_fcfs[0])
-        fila_fcfs.remove(fila_fcfs[0])
+        # Se tiver alguém na fila e ninguém executando
+        # Retira da fila e começa a execução
+        if fila_fcfs and not em_execucao:
+            em_execucao.append(fila_fcfs[0])
+            fila_fcfs.remove(fila_fcfs[0])
+
+        # Contador incrementa em 1
+        cont += 1
+
+        # O processo em execução vai
+        # Decrementar o tempo de pico necessário para conclusão
+        # Incrementar o tempo retorno
+        # E os outros processos na fila irão incrementar tempo de espera, resposta e retorno
+        if em_execucao:
+            em_execucao[0].tempo_pico -= 1
+            em_execucao[0].tempo_retorno += 1
+            for p in fila_fcfs:
+                p.tempo_espera += 1
+                p.tempo_resposta += 1
+                p.tempo_retorno += 1
+        # Como essa fila é FCFS tempo de espera == tempo de resposta
+
+        # Se o processo em execução tiver seu tempo de pico faltando igual a 0
+        # Então ele foi finalizado, logo sai do processo em execução e
+        # Entra na lista de processos concluídos
+        if em_execucao and em_execucao[0].tempo_pico == 0:
+            processos_concluidos.append(em_execucao[0])
+            em_execucao.pop()
 
     # Calcula o tempo médio dos tempos de retorno, resposta e espera
-    tempo_retorno = sum(p.tempo_retorno for p in processos_resu) / len(processos_resu)
-    tempo_resposta = sum(p.tempo_resposta for p in processos_resu) / len(processos_resu)
-    tempo_espera = sum(p.tempo_espera for p in processos_resu) / len(processos_resu)
+    tempo_retorno = sum(p.tempo_retorno for p in processos_concluidos) / len(
+        processos_concluidos
+    )
+    tempo_resposta = sum(p.tempo_resposta for p in processos_concluidos) / len(
+        processos_concluidos
+    )
+    tempo_espera = sum(p.tempo_espera for p in processos_concluidos) / len(
+        processos_concluidos
+    )
 
     # Retorna as médias dos tempos
     return f"FCFS {tempo_retorno:.1f} {tempo_resposta:.1f} {tempo_espera:.1f}"
