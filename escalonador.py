@@ -35,7 +35,7 @@ def first_come_first_served(processos: list):
         processos, key=lambda p: p.tempo_chegada
     )  # Cópia dos processos
     fila_fcfs = []  # Fila de processos
-    em_execucao = []  # Processo em execução
+    em_execucao = None  # Processo em execução
     processos_concluidos = []  # Processos concluídos
     cont = 0  # Contador
 
@@ -50,13 +50,16 @@ def first_come_first_served(processos: list):
 
         # Se tiver alguém na fila e ninguém executando
         # Retira da fila e começa a execução
-        if fila_fcfs and not em_execucao:
-            em_execucao.append(fila_fcfs[0])
-            fila_fcfs.remove(fila_fcfs[0])
+        # (while: processo com pico 0 conclui na hora e o próximo é despachado)
+        while fila_fcfs and em_execucao is None:
+            em_execucao = fila_fcfs.pop(0)
             # Marca o tempo de resposta (primeira vez que ganha CPU)
-            if not em_execucao[0].resposta_definida:
-                em_execucao[0].tempo_resposta = cont - em_execucao[0].tempo_chegada
-                em_execucao[0].resposta_definida = True
+            if not em_execucao.resposta_definida:
+                em_execucao.tempo_resposta = cont - em_execucao.tempo_chegada
+                em_execucao.resposta_definida = True
+            if em_execucao.tempo_pico == 0:
+                processos_concluidos.append(em_execucao)
+                em_execucao = None
 
         # Contador incrementa em 1
         cont += 1
@@ -66,8 +69,8 @@ def first_come_first_served(processos: list):
         # Incrementar o tempo retorno
         # E os outros processos na fila irão incrementar tempo de espera, resposta e retorno
         if em_execucao:
-            em_execucao[0].tempo_pico -= 1
-            em_execucao[0].tempo_retorno += 1
+            em_execucao.tempo_pico -= 1
+            em_execucao.tempo_retorno += 1
             for p in fila_fcfs:
                 p.tempo_espera += 1
                 p.tempo_resposta += 1
@@ -77,9 +80,9 @@ def first_come_first_served(processos: list):
         # Se o processo em execução tiver seu tempo de pico faltando igual a 0
         # Então ele foi finalizado, logo sai do processo em execução e
         # Entra na lista de processos concluídos
-        if em_execucao and em_execucao[0].tempo_pico == 0:
-            processos_concluidos.append(em_execucao[0])
-            em_execucao.pop()
+        if em_execucao and em_execucao.tempo_pico <= 0:
+            processos_concluidos.append(em_execucao)
+            em_execucao = None
 
     # Calcula o tempo médio dos tempos de retorno, resposta e espera
     tempo_retorno = sum(p.tempo_retorno for p in processos_concluidos) / len(
@@ -116,15 +119,18 @@ def shortest_job_first(processos: list):
 
         # Se não tiver ninguém executando e houver processos na fila
         # Escolhe o processo com menor tempo de pico (SJF não-preemptivo)
-        if em_execucao is None and fila_prontos:
+        # (while: processo com pico 0 conclui na hora e o próximo é despachado)
+        while em_execucao is None and fila_prontos:
             # Ordena por tempo de pico (menor primeiro)
             fila_prontos.sort(key=lambda p: p.tempo_pico)
-            em_execucao = fila_prontos[0]
-            fila_prontos.remove(em_execucao)
+            em_execucao = fila_prontos.pop(0)
             # Marca o tempo de resposta (primeira vez que ganha CPU)
             if not em_execucao.resposta_definida:
                 em_execucao.tempo_resposta = cont - em_execucao.tempo_chegada
                 em_execucao.resposta_definida = True
+            if em_execucao.tempo_pico == 0:
+                processos_concluidos.append(em_execucao)
+                em_execucao = None
 
         # Incrementa o contador
         cont += 1
@@ -141,7 +147,7 @@ def shortest_job_first(processos: list):
                 p.tempo_retorno += 1
 
         # Se o processo em execução terminou
-        if em_execucao and em_execucao.tempo_pico == 0:
+        if em_execucao and em_execucao.tempo_pico <= 0:
             processos_concluidos.append(em_execucao)
             em_execucao = None
 
@@ -185,13 +191,17 @@ def round_robin(processos: list, quantum: int = 2):
             preempted = None
 
         # 3. Se CPU ocioso, despacha próximo processo
-        if em_execucao is None and fila_prontos:
+        # (while: processo com pico 0 conclui na hora e o próximo é despachado)
+        while em_execucao is None and fila_prontos:
             em_execucao = fila_prontos.pop(0)
             tempo_quantum = 0
             # Marca o tempo de resposta (primeira vez que ganha CPU)
             if not em_execucao.resposta_definida:
                 em_execucao.tempo_resposta = cont - em_execucao.tempo_chegada
                 em_execucao.resposta_definida = True
+            if em_execucao.tempo_pico == 0:
+                processos_concluidos.append(em_execucao)
+                em_execucao = None
 
         # 4. Executa por uma unidade de tempo (cont a cont+1)
         cont += 1
@@ -205,7 +215,7 @@ def round_robin(processos: list, quantum: int = 2):
                 p.tempo_retorno += 1
 
         # 5. Verifica término ou preempção para a PRÓXIMA iteração
-        if em_execucao and em_execucao.tempo_pico == 0:
+        if em_execucao and em_execucao.tempo_pico <= 0:
             processos_concluidos.append(em_execucao)
             em_execucao = None
             tempo_quantum = 0
