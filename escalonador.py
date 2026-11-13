@@ -1,3 +1,6 @@
+import sys
+
+
 class Processo:
 
     # Atributos de cada processo
@@ -7,6 +10,7 @@ class Processo:
         self.tempo_retorno = 0
         self.tempo_resposta = 0
         self.tempo_espera = 0
+        self.resposta_definida = False  # True quando tempo de resposta foi definido
 
     def __str__(self):
         return f"{self.tempo_chegada} {self.tempo_pico} {self.tempo_resposta} {self.tempo_espera} {self.tempo_retorno}"
@@ -49,6 +53,10 @@ def first_come_first_served(processos: list):
         if fila_fcfs and not em_execucao:
             em_execucao.append(fila_fcfs[0])
             fila_fcfs.remove(fila_fcfs[0])
+            # Marca o tempo de resposta (primeira vez que ganha CPU)
+            if not em_execucao[0].resposta_definida:
+                em_execucao[0].tempo_resposta = cont - em_execucao[0].tempo_chegada
+                em_execucao[0].resposta_definida = True
 
         # Contador incrementa em 1
         cont += 1
@@ -84,16 +92,165 @@ def first_come_first_served(processos: list):
         processos_concluidos
     )
 
-    # Retorna as médias dos tempos
-    return f"FCFS {tempo_retorno:.1f} {tempo_resposta:.1f} {tempo_espera:.1f}"
+    # Retorna as médias dos tempos (usando vírgula como separador decimal)
+    return f"FCFS {tempo_retorno:.1f} {tempo_resposta:.1f} {tempo_espera:.1f}".replace('.', ',')
+
+
+def shortest_job_first(processos: list):
+    # Cria cópias dos processos para não modificar os originais
+    processos_copy = sorted(
+        [Processo(p.tempo_chegada, p.tempo_pico) for p in processos],
+        key=lambda p: p.tempo_chegada
+    )
+    fila_prontos = []  # Fila de processos prontos
+    em_execucao = None  # Processo em execução
+    processos_concluidos = []  # Processos concluídos
+    cont = 0  # Contador de tempo
+
+    # Enquanto todos os processos ainda não tiverem sido concluídos executa
+    while len(processos_concluidos) != len(processos):
+        # Vê quais processos chegaram no momento e coloca-os na fila
+        while processos_copy and processos_copy[0].tempo_chegada == cont:
+            fila_prontos.append(processos_copy[0])
+            processos_copy.remove(processos_copy[0])
+
+        # Se não tiver ninguém executando e houver processos na fila
+        # Escolhe o processo com menor tempo de pico (SJF não-preemptivo)
+        if em_execucao is None and fila_prontos:
+            # Ordena por tempo de pico (menor primeiro)
+            fila_prontos.sort(key=lambda p: p.tempo_pico)
+            em_execucao = fila_prontos[0]
+            fila_prontos.remove(em_execucao)
+            # Marca o tempo de resposta (primeira vez que ganha CPU)
+            if not em_execucao.resposta_definida:
+                em_execucao.tempo_resposta = cont - em_execucao.tempo_chegada
+                em_execucao.resposta_definida = True
+
+        # Incrementa o contador
+        cont += 1
+
+        # O processo em execução decrementa seu tempo de pico
+        # Incrementa o tempo de retorno
+        # Processos na fila incrementam tempo de espera, resposta e retorno
+        if em_execucao:
+            em_execucao.tempo_pico -= 1
+            em_execucao.tempo_retorno += 1
+            for p in fila_prontos:
+                p.tempo_espera += 1
+                p.tempo_resposta += 1
+                p.tempo_retorno += 1
+
+        # Se o processo em execução terminou
+        if em_execucao and em_execucao.tempo_pico == 0:
+            processos_concluidos.append(em_execucao)
+            em_execucao = None
+
+    # Calcula as médias
+    tempo_retorno = sum(p.tempo_retorno for p in processos_concluidos) / len(
+        processos_concluidos
+    )
+    tempo_resposta = sum(p.tempo_resposta for p in processos_concluidos) / len(
+        processos_concluidos
+    )
+    tempo_espera = sum(p.tempo_espera for p in processos_concluidos) / len(
+        processos_concluidos
+    )
+
+    return f"SJF {tempo_retorno:.1f} {tempo_resposta:.1f} {tempo_espera:.1f}".replace('.', ',')
+
+
+def round_robin(processos: list, quantum: int = 2):
+    # Cria cópias dos processos para não modificar os originais
+    processos_copy = sorted(
+        [Processo(p.tempo_chegada, p.tempo_pico) for p in processos],
+        key=lambda p: p.tempo_chegada
+    )
+    fila_prontos = []  # Fila de processos prontos
+    em_execucao = None  # Processo em execução
+    processos_concluidos = []  # Processos concluídos
+    cont = 0  # Contador de tempo
+    tempo_quantum = 0  # Contador de quantum atual
+    preempted = None  # Processo preemptado no final da unidade de tempo anterior
+
+    # Enquanto todos os processos ainda não tiverem sido concluídos executa
+    while len(processos_concluidos) != len(processos):
+        # 1. Adiciona chegadas no tempo atual (devem entrar antes do preemptado)
+        while processos_copy and processos_copy[0].tempo_chegada == cont:
+            fila_prontos.append(processos_copy[0])
+            processos_copy.remove(processos_copy[0])
+
+        # 2. Adiciona processo preemptado do final da unidade de tempo anterior
+        if preempted is not None:
+            fila_prontos.append(preempted)
+            preempted = None
+
+        # 3. Se CPU ocioso, despacha próximo processo
+        if em_execucao is None and fila_prontos:
+            em_execucao = fila_prontos.pop(0)
+            tempo_quantum = 0
+            # Marca o tempo de resposta (primeira vez que ganha CPU)
+            if not em_execucao.resposta_definida:
+                em_execucao.tempo_resposta = cont - em_execucao.tempo_chegada
+                em_execucao.resposta_definida = True
+
+        # 4. Executa por uma unidade de tempo (cont a cont+1)
+        cont += 1
+
+        if em_execucao:
+            em_execucao.tempo_pico -= 1
+            em_execucao.tempo_retorno += 1
+            tempo_quantum += 1
+            for p in fila_prontos:
+                p.tempo_espera += 1
+                p.tempo_retorno += 1
+
+        # 5. Verifica término ou preempção para a PRÓXIMA iteração
+        if em_execucao and em_execucao.tempo_pico == 0:
+            processos_concluidos.append(em_execucao)
+            em_execucao = None
+            tempo_quantum = 0
+        elif em_execucao and tempo_quantum == quantum:
+            preempted = em_execucao
+            em_execucao = None
+            tempo_quantum = 0
+
+    # Calcula as médias
+    tempo_retorno = sum(p.tempo_retorno for p in processos_concluidos) / len(
+        processos_concluidos
+    )
+    tempo_resposta = sum(p.tempo_resposta for p in processos_concluidos) / len(
+        processos_concluidos
+    )
+    tempo_espera = sum(p.tempo_espera for p in processos_concluidos) / len(
+        processos_concluidos
+    )
+
+    return f"RR {tempo_retorno:.1f} {tempo_resposta:.1f} {tempo_espera:.1f}".replace('.', ',')
 
 
 def main():
 
-    # Lê os processos
-    processos = instancia_processos("processos.txt")
-    # Printa as estatísticas segundo o algoritmo FCFS
-    print(first_come_first_served(processos=processos))
+    # Aceita um arquivo informado na linha de comando; sem argumento, lê stdin.
+    if len(sys.argv) > 1:
+        processos_originais = instancia_processos(sys.argv[1])
+    else:
+        valores = sys.stdin.read().split()
+        processos_originais = [
+            Processo(int(valores[i]), int(valores[i + 1]))
+            for i in range(0, len(valores) - 1, 2)
+        ]
+
+    if not processos_originais:
+        return
+    
+    # Cria cópias frescas para cada algoritmo
+    def criar_processos(lista):
+        return [Processo(p.tempo_chegada, p.tempo_pico) for p in lista]
+    
+    # Printa as estatísticas segundo cada algoritmo
+    print(first_come_first_served(processos=criar_processos(processos_originais)))
+    print(shortest_job_first(processos=criar_processos(processos_originais)))
+    print(round_robin(processos=criar_processos(processos_originais)))
 
 
 if __name__ == "__main__":
