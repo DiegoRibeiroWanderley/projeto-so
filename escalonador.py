@@ -1,3 +1,9 @@
+"""
+Dupla:
+- Diego Ribeiro Wanderley - 20250017738
+- Saulo Ramos Rodrigues - 20250017818
+"""
+
 import sys
 
 
@@ -30,10 +36,11 @@ def instancia_processos(nome_arquivo: str):
 
 
 def first_come_first_served(processos: list):
-
+    # Cria cópias dos processos para não modificar os originais
     processos_copy = sorted(
-        processos, key=lambda p: p.tempo_chegada
-    )  # Cópia dos processos
+        [Processo(p.tempo_chegada, p.tempo_pico) for p in processos],
+        key=lambda p: p.tempo_chegada,
+    )
     fila_fcfs = []  # Fila de processos
     em_execucao = None  # Processo em execução
     processos_concluidos = []  # Processos concluídos
@@ -53,10 +60,8 @@ def first_come_first_served(processos: list):
         # (while: processo com pico 0 conclui na hora e o próximo é despachado)
         while fila_fcfs and em_execucao is None:
             em_execucao = fila_fcfs.pop(0)
-            # Marca o tempo de resposta (primeira vez que ganha CPU)
-            if not em_execucao.resposta_definida:
-                em_execucao.tempo_resposta = cont - em_execucao.tempo_chegada
-                em_execucao.resposta_definida = True
+            # Tempo de resposta: quanto esperou desde a chegada até ganhar a CPU
+            em_execucao.tempo_resposta = cont - em_execucao.tempo_chegada
             if em_execucao.tempo_pico == 0:
                 processos_concluidos.append(em_execucao)
                 em_execucao = None
@@ -64,16 +69,15 @@ def first_come_first_served(processos: list):
         # Contador incrementa em 1
         cont += 1
 
-        # O processo em execução vai
+        # O processo em execução vai:
         # Decrementar o tempo de pico necessário para conclusão
         # Incrementar o tempo retorno
-        # E os outros processos na fila irão incrementar tempo de espera, resposta e retorno
+        # E os outros processos na fila irão incrementar tempo de espera e retorno
         if em_execucao:
             em_execucao.tempo_pico -= 1
             em_execucao.tempo_retorno += 1
             for p in fila_fcfs:
                 p.tempo_espera += 1
-                p.tempo_resposta += 1
                 p.tempo_retorno += 1
         # Como essa fila é FCFS tempo de espera == tempo de resposta
 
@@ -96,14 +100,16 @@ def first_come_first_served(processos: list):
     )
 
     # Retorna as médias dos tempos (usando vírgula como separador decimal)
-    return f"FCFS {tempo_retorno:.1f} {tempo_resposta:.1f} {tempo_espera:.1f}".replace('.', ',')
+    return f"FCFS {tempo_retorno:.1f} {tempo_resposta:.1f} {tempo_espera:.1f}".replace(
+        ".", ","
+    )
 
 
 def shortest_job_first(processos: list):
     # Cria cópias dos processos para não modificar os originais
     processos_copy = sorted(
         [Processo(p.tempo_chegada, p.tempo_pico) for p in processos],
-        key=lambda p: p.tempo_chegada
+        key=lambda p: p.tempo_chegada,
     )
     fila_prontos = []  # Fila de processos prontos
     em_execucao = None  # Processo em execução
@@ -124,10 +130,8 @@ def shortest_job_first(processos: list):
             # Ordena por tempo de pico (menor primeiro)
             fila_prontos.sort(key=lambda p: p.tempo_pico)
             em_execucao = fila_prontos.pop(0)
-            # Marca o tempo de resposta (primeira vez que ganha CPU)
-            if not em_execucao.resposta_definida:
-                em_execucao.tempo_resposta = cont - em_execucao.tempo_chegada
-                em_execucao.resposta_definida = True
+            # Tempo de resposta: quanto esperou desde a chegada até ganhar a CPU
+            em_execucao.tempo_resposta = cont - em_execucao.tempo_chegada
             if em_execucao.tempo_pico == 0:
                 processos_concluidos.append(em_execucao)
                 em_execucao = None
@@ -137,13 +141,12 @@ def shortest_job_first(processos: list):
 
         # O processo em execução decrementa seu tempo de pico
         # Incrementa o tempo de retorno
-        # Processos na fila incrementam tempo de espera, resposta e retorno
+        # Processos na fila incrementam tempo de espera e retorno
         if em_execucao:
             em_execucao.tempo_pico -= 1
             em_execucao.tempo_retorno += 1
             for p in fila_prontos:
                 p.tempo_espera += 1
-                p.tempo_resposta += 1
                 p.tempo_retorno += 1
 
         # Se o processo em execução terminou
@@ -162,14 +165,16 @@ def shortest_job_first(processos: list):
         processos_concluidos
     )
 
-    return f"SJF {tempo_retorno:.1f} {tempo_resposta:.1f} {tempo_espera:.1f}".replace('.', ',')
+    return f"SJF {tempo_retorno:.1f} {tempo_resposta:.1f} {tempo_espera:.1f}".replace(
+        ".", ","
+    )
 
 
 def round_robin(processos: list, quantum: int = 2):
     # Cria cópias dos processos para não modificar os originais
     processos_copy = sorted(
         [Processo(p.tempo_chegada, p.tempo_pico) for p in processos],
-        key=lambda p: p.tempo_chegada
+        key=lambda p: p.tempo_chegada,
     )
     fila_prontos = []  # Fila de processos prontos
     em_execucao = None  # Processo em execução
@@ -235,7 +240,9 @@ def round_robin(processos: list, quantum: int = 2):
         processos_concluidos
     )
 
-    return f"RR {tempo_retorno:.1f} {tempo_resposta:.1f} {tempo_espera:.1f}".replace('.', ',')
+    return f"RR {tempo_retorno:.1f} {tempo_resposta:.1f} {tempo_espera:.1f}".replace(
+        ".", ","
+    )
 
 
 def main():
@@ -252,11 +259,11 @@ def main():
 
     if not processos_originais:
         return
-    
+
     # Cria cópias frescas para cada algoritmo
     def criar_processos(lista):
         return [Processo(p.tempo_chegada, p.tempo_pico) for p in lista]
-    
+
     # Printa as estatísticas segundo cada algoritmo
     print(first_come_first_served(processos=criar_processos(processos_originais)))
     print(shortest_job_first(processos=criar_processos(processos_originais)))
